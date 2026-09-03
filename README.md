@@ -96,7 +96,7 @@ fixtures, and the story is in [FEEDBACK.md](FEEDBACK.md).
 
     pip install -e ".[dev]"
     python -m pulled.server          # http://127.0.0.1:8931/mcp
-    pytest                           # 33 tests, no network, no port opened
+    pytest                           # 34 tests, no network, no port opened
 
 The suite drives the server through an in-memory client and server pair, so no
 socket is opened and a failing run cannot leave a listener behind.

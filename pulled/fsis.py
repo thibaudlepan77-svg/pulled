@@ -149,14 +149,26 @@ def since(day: date, limit: int = 100) -> list[Recall]:
 
 
 def search_product(terms: str, limit: int = 50) -> list[Recall]:
+    """Records that could be the thing the caller is holding, best fit first.
+
+    There is no server side search, so the whole feed is filtered here and the
+    result is capped. Taking the first `limit` records that share any one word
+    is what a naive filter does, and it loses. Asking about ground beef, 68
+    records carry both words and only 15 of them survived the cap, because
+    newer records mentioning just beef, or just ground, got there first.
+
+    So the records that carry every word come first, and partial matches only
+    fill what is left.
+    """
     words = [w.lower() for w in terms.split() if len(w) > 2]
     if not words:
         return []
-    hits = []
+    complete, partial = [], []
     for recall in all_recalls():
         haystack = f"{recall.product} {recall.firm}".lower()
-        if any(word in haystack for word in words):
-            hits.append(recall)
-        if len(hits) >= limit:
-            break
-    return hits
+        present = [word for word in words if word in haystack]
+        if len(present) == len(words):
+            complete.append(recall)
+        elif present:
+            partial.append(recall)
+    return (complete + partial)[:limit]

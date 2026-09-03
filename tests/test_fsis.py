@@ -81,3 +81,22 @@ def test_the_spanish_edition_is_kept_when_it_is_the_only_one():
 def test_a_record_with_no_number_is_never_folded_into_another():
     numberless = dict(MEATLOAF, field_recall_number="")
     assert len(fsis._one_per_recall([numberless, dict(numberless)])) == 2
+
+
+def test_records_carrying_every_word_come_before_partial_matches(monkeypatch):
+    # Asking about ground beef, 68 records carry both words and only 15 got
+    # through a filter that took the first fifty sharing any one of them.
+    complet = dict(MEATLOAF, field_recall_number="A",
+                   field_product_items=["Ground Beef Patties"])
+    partiel = dict(MEATLOAF, field_recall_number="B",
+                   field_product_items=["Ground Turkey"])
+    autre = dict(MEATLOAF, field_recall_number="C",
+                 field_product_items=["Beef Jerky"])
+    monkeypatch.setattr(fsis, "_download", lambda: [partiel, autre, complet])
+
+    trouve = fsis.search_product("ground beef")
+    assert [r.number for r in trouve][0] == "A"
+    assert {r.number for r in trouve} == {"A", "B", "C"}
+
+    serre = fsis.search_product("ground beef", limit=1)
+    assert [r.number for r in serre] == ["A"]
