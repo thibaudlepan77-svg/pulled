@@ -40,8 +40,10 @@ Run these from the repository root, with the package installed.
 | It passes on a machine that is not mine | `.github/workflows/tests.yml` | the run status on `api.github.com/repos/thibaudlepan77-svg/pulled/actions/runs` |
 
 The last one earned its place. The suite was green here and red on a clean
-machine for three runs, because the SDK floor had no ceiling and a fresh
-install pulled a major version this was never run against.
+machine for two runs, because the SDK floor had no ceiling and a fresh install
+pulled a major version this was never run against. The failing import was
+`create_connected_server_and_client_session`, which the 2.x line no longer
+exposes.
 
 ## What is not claimed anywhere
 
