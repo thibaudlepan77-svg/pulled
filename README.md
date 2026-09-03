@@ -41,6 +41,14 @@ I found a recall that might be yours, but I am not sure.
 Does yours say vodka on the pack?
 ```
 
+## Seeing it run
+
+    python demo.py --offline
+
+Plays a kitchen conversation through the protocol against fixed records, so a
+screen recording gives the same take twice. Drop `--offline` to run it against
+the live feed. Neither opens a port.
+
 ## How the matching works
 
 Every candidate is scored on how much of what the caller said appears in the
