@@ -11,7 +11,7 @@ import pytest
 import mcp.types as types
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from pulled import openfda, server
+from pulled import openfda, server, sources
 
 
 def recall(product: str, firm: str, reason: str) -> openfda.Recall:
@@ -31,8 +31,10 @@ def recall(product: str, firm: str, reason: str) -> openfda.Recall:
 
 BITES = recall("Dark Chocolate Coconut Almond Bites, 3.17oz, Plastic Pouch",
                "Sunridge Farms", "Undeclared peanuts")
-SAUCE = recall("Vodka Tomato Sauce, NET WT. 24 oz, glass jar",
+SAUCE = recall("Nonna Rosa Roasted Garlic Tomato Sauce, NET WT. 24 oz, glass jar",
                "Nonna Rosa", "Label declares cream and cheese, but Milk is not declared")
+TUB = recall("Loard's Rocky Road Ice Cream - 56 oz",
+             "Silver Moon LP dba Loard's Ice Cream", "Undeclared Milk, Walnuts, Eggs")
 
 
 def payload(result):
@@ -41,8 +43,8 @@ def payload(result):
 
 @pytest.fixture
 def offline(monkeypatch, tmp_path):
-    monkeypatch.setattr(openfda, "search_product", lambda terms, limit=50: [BITES, SAUCE])
-    monkeypatch.setattr(openfda, "since", lambda day, limit=100, country="United States": [BITES, SAUCE])
+    monkeypatch.setattr(sources, "search_product", lambda terms, limit=50: [BITES, SAUCE])
+    monkeypatch.setattr(sources, "since", lambda day, limit=100, country="United States": [BITES, SAUCE])
     monkeypatch.setattr(server, "HOUSEHOLD", tmp_path / "household.json")
 
 
@@ -105,11 +107,11 @@ async def refusing(context, params):
 
 @pytest.mark.anyio
 async def test_a_vague_product_is_settled_by_asking_through_the_protocol(offline):
-    caller = answering("vodka")
+    caller = answering("roasted garlic")
     async with create_connected_server_and_client_session(
             server.server._mcp_server, elicitation_callback=caller) as client:
         answer = payload(await client.call_tool("check_item", {"description": "tomato sauce"}))
-    assert caller.asked and "vodka" in caller.asked
+    assert caller.asked and "roasted" in caller.asked
     assert answer["outcome"] == "recalled"
     assert "Nonna Rosa" in answer["say"]
 
@@ -121,6 +123,34 @@ async def test_a_caller_who_declines_still_gets_the_question_back(offline):
         answer = payload(await client.call_tool("check_item", {"description": "tomato sauce"}))
     assert answer["outcome"] == "unclear"
     assert answer["ask"]
+
+
+def test_a_recall_is_read_out_the_way_a_person_would_name_it():
+    # The feed appends the size behind a dash and files the maker under a
+    # corporate name. Neither is printed on the tub in the kitchen.
+    spoken = server._spoken(TUB)
+    assert spoken.startswith("Loard's Rocky Road Ice Cream was recalled")
+    assert "56 oz" not in spoken
+    assert "Silver Moon" not in spoken
+
+
+def test_the_maker_is_named_when_the_product_does_not_already_say_it():
+    assert "from Sunridge Farms" in server._spoken(BITES)
+
+
+def test_the_usda_wording_for_status_is_not_repeated_back_as_is():
+    usda = recall("Frozen Meatloaf", "Power Plate Meals, LLC", "Unreported Allergens, milk")
+    usda = openfda.Recall(**{**usda.__dict__, "status": "Active Recall"})
+    assert "The recall is active, Class I." in server._spoken(usda)
+
+
+def test_a_public_health_alert_is_not_announced_as_a_recall():
+    alert = recall("Jalapeno Products", "", "Product Contamination")
+    alert = openfda.Recall(**{**alert.__dict__, "status": "Public Health Alert",
+                              "classification": "Public Health Alert"})
+    spoken = server._spoken(alert)
+    assert "was recalled" not in spoken
+    assert "public health alert" in spoken
 
 
 @pytest.fixture

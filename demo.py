@@ -1,6 +1,6 @@
 """Play a kitchen conversation through the server, for a screen recording.
 
-    python demo.py                 live openFDA data
+    python demo.py                 the live FDA and USDA feeds
     python demo.py --offline       fixed records, for a repeatable take
 
 Everything goes through the MCP protocol on an in-memory stream pair, so what
@@ -19,45 +19,83 @@ from datetime import date
 import mcp.types as types
 from mcp.shared.memory import create_connected_server_and_client_session
 
-from pulled import openfda, server
+from pulled import openfda, server, sources
 
 CONVERSATION = [
     ("set_allergens", {"allergens": ["peanuts", "milk"]},
      "First, tell it what this household reacts to."),
     ("check_item", {"description": "dark chocolate coconut almond bites"},
      "Someone is holding a pouch and reads the front of it out loud."),
-    ("check_item", {"description": "tomato sauce"},
-     "Now something vague. The server asks one question and settles it."),
+    ("check_item", {"description": "loard's ice cream"},
+     "Now a tub. The FDA published forty-three Loard's flavours on one day,\n"
+     "four of them below, each with its own allergens. The name on the lid\n"
+     "cannot answer, so the server asks and settles it."),
+    ("check_item", {"description": "power plate meals meatloaf with garlic mashed potatoes"},
+     "Now the freezer. Meat, poultry and eggs belong to the USDA, not the FDA,\n"
+     "so a checker wired to one feed is silent here."),
     ("check_item", {"description": "cheddar crackers from the corner shop"},
-     "And something that is simply not in the feed."),
-    ("recent_recalls", {"days": 45},
+     "And something that is simply not in either feed."),
+    ("recent_recalls", {"days": 150},
      "Finally, what has been pulled lately that touches this household."),
 ]
 
+# Wording, dates and reasons copied from the records named below, five from
+# openFDA and one from the USDA, so a viewer can pull the same rows from the
+# public endpoints and check them.
 FIXTURES = [
     openfda.Recall(
-        number="F-0918-2026", initiated=date(2026, 5, 23),
-        product="Dark Chocolate Coconut Almond Bites, 3.17oz, Plastic Pouch",
+        number="H-1228-2026", initiated=date(2026, 5, 23),
+        product="Dark Chocolate Coconut Almond Bites, 3.17oz, Plastic Pouches",
         reason="Undeclared peanuts", status="Ongoing", classification="Class I",
         firm="Bazzini LLC", country="United States", distribution="Nationwide",
         lot_codes="Lot 4471, best by 12/2026"),
     openfda.Recall(
-        number="F-1102-2026", initiated=date(2026, 7, 23),
-        product="Vodka Tomato Sauce, NET WT. 24 oz / 680g, glass jar",
-        reason="Label declares cream and cheese, but Milk is not declared",
-        status="Ongoing", classification="Class II", firm="Sheandro LLC",
-        country="United States", distribution="NY, NJ, CT", lot_codes="0725"),
+        number="H-0743-2026", initiated=date(2026, 4, 15),
+        product="Loard's Peanut Butter Fudge Ice Cream - 32 oz",
+        reason="Undeclared Milk, Peanuts", status="Ongoing",
+        classification="Class II", firm="Silver Moon LP dba Loard's Ice Cream",
+        country="United States", distribution="Northern California",
+        lot_codes=""),
+    openfda.Recall(
+        number="H-0746-2026", initiated=date(2026, 4, 15),
+        product="Loard's Pistachio Ice Cream - 32 oz",
+        reason="Undeclared Milk, Pistachios, Yellow #5, Blue #1",
+        status="Ongoing", classification="Class II",
+        firm="Silver Moon LP dba Loard's Ice Cream",
+        country="United States", distribution="Northern California",
+        lot_codes=""),
+    openfda.Recall(
+        number="H-0750-2026", initiated=date(2026, 4, 15),
+        product="Loard's Rocky Road Ice Cream - 56 oz",
+        reason="Undeclared Milk, Walnuts, Eggs", status="Ongoing",
+        classification="Class II", firm="Silver Moon LP dba Loard's Ice Cream",
+        country="United States", distribution="Northern California",
+        lot_codes=""),
+    openfda.Recall(
+        number="H-0730-2026", initiated=date(2026, 4, 15),
+        product="Loard's Coconut Pineapple Ice Cream - 32 oz; 56 oz",
+        reason="Undeclared Milk", status="Ongoing", classification="Class II",
+        firm="Silver Moon LP dba Loard's Ice Cream", country="United States",
+        distribution="Northern California", lot_codes=""),
+    openfda.Recall(
+        number="008-2026", initiated=date(2026, 6, 18),
+        product='13.3-oz. vacuum sealed plastic tray packages containing '
+                '"POWER PLATE MEALS MEATLOAF WITH GARLIC MASHED POTATOES"',
+        reason="Unreported Allergens, milk", status="Active Recall",
+        classification="Class II", firm="Power Plate Meals, LLC",
+        country="United States", distribution="Minnesota North Dakota South Dakota",
+        lot_codes="", agency="USDA FSIS"),
 ]
 
 
 def offline():
-    openfda.search_product = lambda terms, limit=50: list(FIXTURES)
-    openfda.since = lambda day, limit=100, country="United States": list(FIXTURES)
+    sources.search_product = lambda terms, limit=50: list(FIXTURES)
+    sources.since = lambda day, limit=100, country="United States": list(FIXTURES)
 
 
 # The person in the kitchen, standing in for a real client. When the server
 # asks a question through elicitation, this is what answers it.
-KITCHEN_REPLIES = {"vodka": "vodka"}
+KITCHEN_REPLIES = {"front of the pack": "peanut butter fudge"}
 
 
 async def kitchen(context, params):
@@ -77,7 +115,7 @@ async def play() -> None:
         for tool, arguments, note in CONVERSATION:
             print("─" * 68)
             print(note)
-            print(f"  -> {tool}({json.dumps(arguments)[:70]})")
+            print(f"  -> {tool}({json.dumps(arguments)})")
             answer = json.loads((await client.call_tool(tool, arguments)).content[0].text)
             if "say" in answer:
                 print(f"  Alexa: {answer['say']}")

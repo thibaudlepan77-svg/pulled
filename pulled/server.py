@@ -14,13 +14,15 @@ from __future__ import annotations
 
 import json
 import os
+import re
 from datetime import date, timedelta
 from pathlib import Path
 
 from mcp.server.fastmcp import Context, FastMCP
 from pydantic import BaseModel, Field
 
-from . import match, openfda
+from . import match, sources
+from .recall import Recall
 
 HOUSEHOLD = Path(os.environ.get("PULLED_HOME", Path.home() / ".config" / "pulled")) / "household.json"
 
@@ -55,12 +57,41 @@ async def _ask(ctx: Context, question: str) -> str | None:
     return None
 
 
-def _spoken(recall: openfda.Recall) -> str:
+def _said_aloud(recall: Recall) -> tuple[str, str]:
+    """The product and the maker as a person would name them.
+
+    Two habits of the feed survive into speech badly. Sizes are appended to the
+    product with a dash, `Loard's Rocky Road Ice Cream - 56 oz`, and firms are
+    filed under their corporate name with the trading name behind a dba,
+    `Silver Moon LP dba Loard's Ice Cream`. The tub in the kitchen says neither.
+    """
+    product = re.split(r" - ", match.spoken_name(recall.product))[0].strip()
+    firm = re.split(r"\bdba\b", recall.firm, flags=re.IGNORECASE)[-1].strip()
+    return product, firm or recall.firm
+
+
+def _spoken(recall: Recall) -> str:
     when = recall.initiated.strftime("%d %B %Y")
     danger = recall.reason.rstrip(".")
-    return (f"{recall.product.split(',')[0].strip()} from {recall.firm} was recalled on "
-            f"{when}. The reason given is {danger}. The recall is {recall.status.lower()}, "
-            f"{recall.classification}.")
+    product, firm = _said_aloud(recall)
+    # Loard's Pistachio Ice Cream from Loard's Ice Cream. The brand is already
+    # in the product name often enough that the clause has to earn its place,
+    # and 195 of the USDA records carry no firm at all.
+    named = match.tokens(firm)
+    maker = f" from {firm}" if named and named[0] not in match.tokens(product) else ""
+    # An alert is not a recall. 169 of the 1 234 USDA records are alerts, and
+    # calling one a recall tells the caller their dinner has been pulled from
+    # sale when it has not, which is the wrong alarm this server exists to
+    # avoid. openFDA has no alerts and its statuses say ongoing or terminated.
+    alert = "alert" in recall.status.lower()
+    event = "was covered by a public health alert on" if alert else "was recalled on"
+    # The FDA says Ongoing, the USDA says Active Recall, and the second one
+    # lands in the sentence as `the recall is active recall`.
+    standing = re.sub(r"\s*recall$", "", recall.status.strip(), flags=re.IGNORECASE).lower()
+    closing = ("This is a public health alert rather than a recall." if alert
+               else f"The recall is {standing}, {recall.classification}.")
+    return (f"{product}{maker} {event} {when}. "
+            f"The reason given is {danger}. {closing}")
 
 
 class Clarification(BaseModel):
@@ -77,7 +108,7 @@ async def check_item(description: str, ctx: Context | None = None) -> dict:
     reassurance and a wrong alarm are both harmful. Clients without elicitation
     get the same question back in the payload to ask themselves.
     """
-    pool = openfda.search_product(description)
+    pool = sources.search_product(description)
     verdict = match.best(description, pool)
 
     if verdict.outcome == "unclear" and ctx is not None:
@@ -105,8 +136,8 @@ async def check_item(description: str, ctx: Context | None = None) -> dict:
         }
     return {
         "outcome": "clear",
-        "say": "I found no recall matching that. Recalls only cover what the FDA has "
-               "published, so this is not a guarantee that the food is safe.",
+        "say": "I found no recall matching that. This only covers what the FDA and "
+               "the USDA have published, so it is not a guarantee that the food is safe.",
         "searched": len(pool),
     }
 
@@ -118,7 +149,7 @@ def recent_recalls(days: int = 14, only_mine: bool = True, limit: int = 8) -> di
     With only_mine, the list is narrowed to recalls whose stated reason names
     one of the household allergens.
     """
-    found = openfda.since(date.today() - timedelta(days=max(days, 1)), limit=100)
+    found = sources.since(date.today() - timedelta(days=max(days, 1)), limit=100)
     allergens = [a.lower() for a in _household()["allergens"]]
     if only_mine and allergens:
         found = [r for r in found
