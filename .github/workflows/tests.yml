@@ -25,10 +25,12 @@ jobs:
         id: suite
         run: pytest -q 2>&1 | tee suite.log; exit ${PIPESTATUS[0]}
 
-      # The run summary is readable on a public repository without a token,
-      # and the log endpoint is not. A failure nobody can read costs another
-      # round trip, so the tail of the run goes where it can be read.
-      - name: put the tail of the run where it can be read
+      # Reading a failure from the outside is harder than it looks. The API
+      # log endpoint answers 403 to an anonymous request, and the run page
+      # answers "Sign in to view logs" even though the repository is public.
+      # The summary does not change that, it only saves a signed-in reader
+      # from expanding steps.
+      - name: put the tail of the run in the summary
         if: always()
         run: |
           echo '### pytest on ${{ matrix.python }}' >> "$GITHUB_STEP_SUMMARY"

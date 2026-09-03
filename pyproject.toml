@@ -5,7 +5,12 @@ description = "Food recall lookup for a voice assistant, over MCP"
 readme = "README.md"
 requires-python = ">=3.11"
 license = { file = "LICENSE" }
-dependencies = ["mcp>=1.29"]
+# The upper bound is not caution, it is a measurement. Built and verified
+# against 1.29.1, whose protocol version is exactly 2025-11-25. The SDK has
+# since published a 2.x line, so an unbounded floor meant a fresh clone
+# installed a major version this was never run against, and the suite failed
+# on a clean machine while passing here.
+dependencies = ["mcp>=1.29,<2"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8", "anyio>=4"]
