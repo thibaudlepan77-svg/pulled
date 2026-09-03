@@ -31,6 +31,18 @@ Run these from the repository root, with the package installed.
 | They carry 31 distinct reasons | `pulled/match.py` | same response, count the distinct `reason_for_recall` |
 | A search that matches nothing answers 404 | `FEEDBACK.md` 3 | search for a nonsense term and read the status |
 
+## The suite
+
+| claim | where it is written | command |
+| --- | --- | --- |
+| The tests reach neither agency | `README.md`, `no_network.py` | `python no_network.py`, which refuses name resolution and every off-machine connection |
+| The suite listens on nothing | `README.md` | `netstat` while it runs, or read `tests/`, the protocol is driven over an in-memory pair |
+| It passes on a machine that is not mine | `.github/workflows/tests.yml` | the run status on `api.github.com/repos/thibaudlepan77-svg/pulled/actions/runs` |
+
+The last one earned its place. The suite was green here and red on a clean
+machine for three runs, because the SDK floor had no ceiling and a fresh
+install pulled a major version this was never run against.
+
 ## What is not claimed anywhere
 
 That a clear result means the food is safe. The server says the opposite in

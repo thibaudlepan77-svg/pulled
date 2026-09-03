@@ -96,10 +96,20 @@ fixtures, and the story is in [FEEDBACK.md](FEEDBACK.md).
 
     pip install -e ".[dev]"
     python -m pulled.server          # http://127.0.0.1:8931/mcp
-    pytest                           # 34 tests, no network, no port opened
+    pytest                           # 34 tests
+    python no_network.py             # the same 34, with the network refused
 
-The suite drives the server through an in-memory client and server pair, so no
-socket is opened and a failing run cannot leave a listener behind.
+The suite drives the server through an in-memory client and server pair rather
+than a socket, so it listens on nothing and a failing run cannot leave a
+listener behind.
+
+`no_network.py` runs the same tests with name resolution and every off-machine
+connection refused inside the process. It is there because the claim above is
+checkable and a claim nobody checks is decoration. It also corrected the claim.
+An earlier wording said the suite opens no socket at all, which is false on
+Windows, where the asyncio event loop builds a loopback pair to wake itself.
+What is true, and what the check proves, is that nothing here resolves a name
+or leaves the machine.
 
 ## Data
 

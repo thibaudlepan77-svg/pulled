@@ -38,12 +38,8 @@ jobs:
           tail -n 60 suite.log >> "$GITHUB_STEP_SUMMARY"
           echo '```' >> "$GITHUB_STEP_SUMMARY"
 
-      # The suite claims it opens no socket. A claim a machine can check should
-      # be checked by a machine, so the whole thing runs again with outbound
-      # traffic refused. It has to pass identically, and any test that quietly
-      # reached the FDA or the USDA fails here rather than on a judge's laptop.
-      - name: pytest, with the network taken away
-        run: |
-          sudo iptables -P OUTPUT DROP
-          sudo iptables -A OUTPUT -o lo -j ACCEPT
-          pytest -q
+      # The same suite again, with name resolution and every off-machine
+      # connection refused inside the process. A firewall rule was the first
+      # idea and it also cut the runner's own link to GitHub.
+      - name: pytest, with the network refused
+        run: python no_network.py
