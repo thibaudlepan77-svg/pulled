@@ -22,7 +22,19 @@ jobs:
       - run: pip install -e ".[dev]"
 
       - name: pytest
-        run: pytest -q
+        id: suite
+        run: pytest -q 2>&1 | tee suite.log; exit ${PIPESTATUS[0]}
+
+      # The run summary is readable on a public repository without a token,
+      # and the log endpoint is not. A failure nobody can read costs another
+      # round trip, so the tail of the run goes where it can be read.
+      - name: put the tail of the run where it can be read
+        if: always()
+        run: |
+          echo '### pytest on ${{ matrix.python }}' >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
+          tail -n 60 suite.log >> "$GITHUB_STEP_SUMMARY"
+          echo '```' >> "$GITHUB_STEP_SUMMARY"
 
       # The suite claims it opens no socket. A claim a machine can check should
       # be checked by a machine, so the whole thing runs again with outbound
