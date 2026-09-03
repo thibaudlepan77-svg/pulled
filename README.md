@@ -1,5 +1,7 @@
 # pulled
 
+[![tests](https://github.com/thibaudlepan77-svg/pulled/actions/workflows/tests.yml/badge.svg)](https://github.com/thibaudlepan77-svg/pulled/actions/workflows/tests.yml)
+
 An MCP server that lets a voice assistant answer one question in the kitchen.
 Has this been recalled, and does it matter to me.
 
