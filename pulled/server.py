@@ -17,7 +17,8 @@ import os
 from datetime import date, timedelta
 from pathlib import Path
 
-from mcp.server.fastmcp import FastMCP
+from mcp.server.fastmcp import Context, FastMCP
+from pydantic import BaseModel, Field
 
 from . import match, openfda
 
@@ -37,6 +38,23 @@ def _save(household: dict) -> None:
     HOUSEHOLD.write_text(json.dumps(household, indent=1), encoding="utf-8")
 
 
+async def _ask(ctx: Context, question: str) -> str | None:
+    """Put one question to the caller through the protocol.
+
+    A client is free not to support elicitation, and an agent client may answer
+    on the user's behalf. Both are fine and neither is an error here, so a
+    refusal simply leaves the verdict unclear and the question travels back in
+    the payload for the caller to ask however it likes.
+    """
+    try:
+        heard = await ctx.elicit(message=question, schema=Clarification)
+    except Exception:
+        return None
+    if heard.action == "accept" and heard.data:
+        return heard.data.answer
+    return None
+
+
 def _spoken(recall: openfda.Recall) -> str:
     when = recall.initiated.strftime("%d %B %Y")
     danger = recall.reason.rstrip(".")
@@ -45,17 +63,29 @@ def _spoken(recall: openfda.Recall) -> str:
             f"{recall.classification}.")
 
 
+class Clarification(BaseModel):
+    answer: str = Field(description="What the person answered, in their own words")
+
+
 @server.tool()
-def check_item(description: str) -> dict:
+async def check_item(description: str, ctx: Context | None = None) -> dict:
     """Say whether a food item the caller describes out loud is under recall.
 
     Pass what the person actually said, in their words. The answer is one of
-    recalled, unclear or clear. When it is unclear the reply carries a single
-    question to ask back, because a wrong reassurance and a wrong alarm are
-    both harmful.
+    recalled, unclear or clear. When it is unclear the server asks one question
+    through elicitation and settles the answer itself, because a wrong
+    reassurance and a wrong alarm are both harmful. Clients without elicitation
+    get the same question back in the payload to ask themselves.
     """
     pool = openfda.search_product(description)
     verdict = match.best(description, pool)
+
+    if verdict.outcome == "unclear" and ctx is not None:
+        heard = await _ask(ctx, verdict.question)
+        if heard:
+            description = f"{description} {heard}"
+            verdict = match.best(description, pool)
+
     if verdict.outcome == "recalled":
         return {
             "outcome": "recalled",

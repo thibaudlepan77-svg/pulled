@@ -11,7 +11,7 @@ eat the thing in their hand. The data is not missing. The last few metres are.
 
 ## What it does
 
-Three tools, over Streamable HTTP, protocol `2025-11-25`.
+Three tools and one prompt, over Streamable HTTP, protocol `2025-11-25`.
 
 | tool | for |
 | --- | --- |
@@ -22,32 +22,42 @@ Three tools, over Streamable HTTP, protocol `2025-11-25`.
 `check_item` has three outcomes, not two.
 
     recalled   a named record, with the reason in the FDA's own words
-    unclear    one question to ask back, and no verdict
+    unclear    one question, and no verdict
     clear      nothing matched, said as nothing matched and not as it is safe
 
 The middle outcome is the point. A voice assistant that says *yes that is
 recalled* about the wrong jar sends someone to bin their dinner, and one that
 says *no* about the right jar is worse. So when the record hinges on a word the
-caller never said, the server hands back a question instead of an answer.
+caller never said, the server asks about that word instead of answering.
+
+## Asking is part of the protocol, not a field in a payload
+
+When the server is unsure it does not hand a question back and hope the client
+asks it. It raises an elicitation, gets the answer, folds it into the
+description and decides. One tool call, one round trip to the person, one
+verdict.
 
 ```
-> is my dark chocolate coconut almond bites recalled
-Dark Chocolate Coconut Almond Bites from Bazzini LLC was recalled on
-23 May 2026. The reason given is Undeclared peanuts. The recall is ongoing,
-Class I.
-
 > is my tomato sauce recalled
-I found a recall that might be yours, but I am not sure.
-Does yours say vodka on the pack?
+Alexa: Does yours say vodka on the pack?
+Person: vodka
+Alexa: Vodka Tomato Sauce from Sheandro LLC was recalled on 23 July 2026. The
+reason given is Label declares cream and cheese, but Milk is not declared. The
+recall is ongoing, Class II.
 ```
+
+A client that does not support elicitation, or a person who declines to answer,
+loses nothing. The outcome stays `unclear` and the same question comes back in
+the payload for the client to ask however it likes. Both paths are covered by
+tests.
 
 ## Seeing it run
 
     python demo.py --offline
 
-Plays a kitchen conversation through the protocol against fixed records, so a
-screen recording gives the same take twice. Drop `--offline` to run it against
-the live feed. Neither opens a port.
+Plays the whole kitchen conversation through the protocol against fixed
+records, elicitation included, so a screen recording gives the same take twice.
+Drop `--offline` to run it against the live feed. Neither opens a port.
 
 ## How the matching works
 
@@ -65,16 +75,16 @@ then stop a confident answer.
 Sizes, weights, packaging and supply chain boilerplate are stripped before any
 of this, because `3.17oz`, `pouch` and `per` look rare and mean nothing. That
 list grew from running the matcher against the live feed rather than against
-fixtures.
+fixtures, and the story is in [FEEDBACK.md](FEEDBACK.md).
 
 ## Running it
 
     pip install -e ".[dev]"
     python -m pulled.server          # http://127.0.0.1:8931/mcp
-    pytest                           # 12 tests, no network, no port opened
+    pytest                           # 14 tests, no network, no port opened
 
-The test suite drives the server through an in-memory client and server pair,
-so no socket is opened and a failing run cannot leave a listener behind.
+The suite drives the server through an in-memory client and server pair, so no
+socket is opened and a failing run cannot leave a listener behind.
 
 ## Data
 

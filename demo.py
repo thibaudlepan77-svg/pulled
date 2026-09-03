@@ -16,6 +16,7 @@ import logging
 import sys
 from datetime import date
 
+import mcp.types as types
 from mcp.shared.memory import create_connected_server_and_client_session
 
 from pulled import openfda, server
@@ -26,7 +27,7 @@ CONVERSATION = [
     ("check_item", {"description": "dark chocolate coconut almond bites"},
      "Someone is holding a pouch and reads the front of it out loud."),
     ("check_item", {"description": "tomato sauce"},
-     "Now something vague. This is where a confident answer would be wrong."),
+     "Now something vague. The server asks one question and settles it."),
     ("check_item", {"description": "cheddar crackers from the corner shop"},
      "And something that is simply not in the feed."),
     ("recent_recalls", {"days": 45},
@@ -54,8 +55,23 @@ def offline():
     openfda.since = lambda day, limit=100, country="United States": list(FIXTURES)
 
 
+# The person in the kitchen, standing in for a real client. When the server
+# asks a question through elicitation, this is what answers it.
+KITCHEN_REPLIES = {"vodka": "vodka"}
+
+
+async def kitchen(context, params):
+    for word, reply in KITCHEN_REPLIES.items():
+        if word in params.message.lower():
+            print(f"  Alexa: {params.message}")
+            print(f"  Person: {reply}")
+            return types.ElicitResult(action="accept", content={"answer": reply})
+    return types.ElicitResult(action="decline")
+
+
 async def play() -> None:
-    async with create_connected_server_and_client_session(server.server._mcp_server) as client:
+    async with create_connected_server_and_client_session(
+            server.server._mcp_server, elicitation_callback=kitchen) as client:
         listed = await client.list_tools()
         print("tools:", ", ".join(sorted(tool.name for tool in listed.tools)), "\n")
         for tool, arguments, note in CONVERSATION:

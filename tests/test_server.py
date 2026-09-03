@@ -8,6 +8,7 @@ import json
 from datetime import date
 
 import pytest
+import mcp.types as types
 from mcp.shared.memory import create_connected_server_and_client_session
 
 from pulled import openfda, server
@@ -88,6 +89,38 @@ async def test_allergens_narrow_the_recent_list(offline):
     assert mine["filtered_by"] == ["peanuts"]
     assert mine["count"] == 1
     assert everything["count"] == 2
+
+
+def answering(reply: str):
+    async def callback(context, params):
+        callback.asked = params.message
+        return types.ElicitResult(action="accept", content={"answer": reply})
+    callback.asked = None
+    return callback
+
+
+async def refusing(context, params):
+    return types.ElicitResult(action="decline")
+
+
+@pytest.mark.anyio
+async def test_a_vague_product_is_settled_by_asking_through_the_protocol(offline):
+    caller = answering("vodka")
+    async with create_connected_server_and_client_session(
+            server.server._mcp_server, elicitation_callback=caller) as client:
+        answer = payload(await client.call_tool("check_item", {"description": "tomato sauce"}))
+    assert caller.asked and "vodka" in caller.asked
+    assert answer["outcome"] == "recalled"
+    assert "Nonna Rosa" in answer["say"]
+
+
+@pytest.mark.anyio
+async def test_a_caller_who_declines_still_gets_the_question_back(offline):
+    async with create_connected_server_and_client_session(
+            server.server._mcp_server, elicitation_callback=refusing) as client:
+        answer = payload(await client.call_tool("check_item", {"description": "tomato sauce"}))
+    assert answer["outcome"] == "unclear"
+    assert answer["ask"]
 
 
 @pytest.fixture
