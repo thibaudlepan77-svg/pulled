@@ -23,7 +23,16 @@ POOL = [
     recall("Dark Chocolate Coconut Almond Bites, 3.17oz, Plastic Pouch", "Sunridge Farms"),
     recall("King Harvest brand Spinach Hummus. Product is packed in 10oz plastic tub", "King Harvest"),
     recall("Grade A White In-shell Chicken eggs packaged in cartons", "Country Eggs"),
-    recall("Vodka Tomato Sauce, NET WT. 24 oz / 680g, glass jar", "Nonna Rosa"),
+    recall("Sunridge Pistachio Ice Cream - 32 oz", "Sunridge Creamery"),
+]
+
+# Wording taken from real openFDA records, H-0743-2026 and its siblings, all
+# published on the same day by the same creamery.
+FLAVOURS = [
+    recall("Loard's Peanut Butter Fudge Ice Cream - 32 oz", "Silver Moon LP dba Loard's Ice Cream"),
+    recall("Loard's Pistachio Ice Cream - 32 oz", "Silver Moon LP dba Loard's Ice Cream"),
+    recall("Loard's Rocky Road Ice Cream - 56 oz", "Silver Moon LP dba Loard's Ice Cream"),
+    recall("Loard's Egg Nog Ice Cream - 32 oz", "Silver Moon LP dba Loard's Ice Cream"),
 ]
 
 
@@ -44,9 +53,32 @@ def test_an_unrelated_product_is_cleared():
 
 
 def test_a_partial_description_asks_rather_than_guesses():
-    verdict = best("tomato sauce", POOL)
+    verdict = best("ice cream", POOL)
     assert verdict.outcome == "unclear"
     assert verdict.question
+
+
+def test_a_recalled_family_is_named_back_and_the_rest_of_the_label_asked_for():
+    verdict = best("loard's ice cream", FLAVOURS)
+    assert verdict.outcome == "unclear"
+    assert "Loard's Ice Cream" in verdict.question
+    assert "4 recalls" in verdict.question
+
+
+def test_the_makers_own_name_is_never_the_question():
+    # Live descriptions open with the corporate name, and the caller reading
+    # the front of the pint has already said the part that is printed on it.
+    pool = [recall("STRAUS FAMILY CREAMERY Mint Chip ORGANIC ICE CREAM ONE PINT",
+                   "Straus Family Creamery")]
+    verdict = best("straus mint chip ice cream", pool)
+    assert "family" not in (verdict.question or "").lower()
+    assert "creamery" not in (verdict.question or "").lower()
+
+
+def test_the_flavour_settles_what_the_family_could_not():
+    verdict = best("loard's ice cream peanut butter fudge", FLAVOURS)
+    assert verdict.outcome == "recalled"
+    assert verdict.recall.product.startswith("Loard's Peanut Butter Fudge")
 
 
 def test_two_equally_good_records_do_not_produce_a_yes():
