@@ -11,9 +11,10 @@ import json
 import time
 import urllib.parse
 import urllib.request
-from dataclasses import dataclass
 from datetime import date, timedelta
 from pathlib import Path
+
+from .recall import Recall
 
 ENDPOINT = "https://api.fda.gov/food/enforcement.json"
 CACHE = Path.home() / ".cache" / "pulled" / "openfda"
@@ -23,24 +24,6 @@ USER_AGENT = "pulled/0.1 (+https://github.com/thibaudlepan77-svg/pulled)"
 
 class OpenFdaUnavailable(RuntimeError):
     pass
-
-
-@dataclass(frozen=True)
-class Recall:
-    number: str
-    initiated: date
-    product: str
-    reason: str
-    status: str
-    classification: str
-    firm: str
-    country: str
-    distribution: str
-    lot_codes: str
-
-    @property
-    def ongoing(self) -> bool:
-        return self.status.lower() == "ongoing"
 
 
 def _parse_day(raw: str) -> date:
@@ -59,6 +42,7 @@ def _to_recall(record: dict) -> Recall:
         country=record.get("country", ""),
         distribution=record.get("distribution_pattern", ""),
         lot_codes=record.get("code_info", ""),
+        agency="FDA",
     )
 
 
