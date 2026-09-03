@@ -9,6 +9,11 @@ and it is written for regulators, so `Undeclared colors (Yellow #5, Yellow #6,
 and/or Red #40)` sits between a parent and the fact that their child should not
 eat the thing in their hand. The data is not missing. The last few metres are.
 
+They are also split in two. The FDA covers most of the shelf and the USDA
+covers meat, poultry and eggs through a separate feed with a separate shape.
+A checker wired to one of them is silent on chicken, deli meat and ground beef.
+`pulled` reads both, and neither can take the other down.
+
 ## What it does
 
 Three tools and one prompt, over Streamable HTTP, protocol `2025-11-25`.
@@ -37,14 +42,21 @@ asks it. It raises an elicitation, gets the answer, folds it into the
 description and decides. One tool call, one round trip to the person, one
 verdict.
 
+```citation
+> is my Loard's ice cream recalled
+Alexa: I found 38 recalls that all match Loard's Ice Cream. What else does the
+front of the pack say?
+Person: peanut butter fudge
+Alexa: Loard's Peanut Butter Fudge Ice Cream was recalled on 15 April 2026. The
+reason given is Undeclared Milk, Peanuts. The recall is ongoing, Class II.
 ```
-> is my tomato sauce recalled
-Alexa: Does yours say vodka on the pack?
-Person: vodka
-Alexa: Vodka Tomato Sauce from Sheandro LLC was recalled on 23 July 2026. The
-reason given is Label declares cream and cheese, but Milk is not declared. The
-recall is ongoing, Class II.
-```
+
+That exchange is not a contrived one. On 15 April 2026 the FDA published
+forty-eight records from one creamery in a single batch, forty-three of them
+Loard's ice cream, carrying thirty-one different reasons between them. Peanut
+Butter Fudge is undeclared milk and peanuts, Pistachio is milk and pistachios,
+Rocky Road is milk, walnuts and eggs. The brand cannot answer the question.
+The flavour is the whole answer.
 
 A client that does not support elicitation, or a person who declines to answer,
 loses nothing. The outcome stays `unclear` and the same question comes back in
@@ -65,12 +77,15 @@ Every candidate is scored on how much of what the caller said appears in the
 record, weighted by how rare each word is inside the candidate pool. Two rules
 then stop a confident answer.
 
-- **The near tie.** If a second record fits as well as the first, we have found
-  a family of products, not a product, so naming a manufacturer would be a
-  guess. Ask which one.
+- **The near tie.** If other records fit as well as the first, we have found a
+  family of products, not a product. Naming one would be a guess, so the server
+  names the shared part back and asks for the rest of the label. Forty-three
+  flavours of one brand in one batch is what this rule is for.
 - **The unsaid word.** If the product name carries a word at least as
   distinctive as anything the caller said, and they did not say it, that word
-  is probably the difference between their jar and this one. Ask about it.
+  is probably the difference between their tub and this one. Ask about it. The
+  maker's own name is excluded, because a caller who says Straus should not be
+  asked whether their pint says family.
 
 Sizes, weights, packaging and supply chain boilerplate are stripped before any
 of this, because `3.17oz`, `pouch` and `per` look rare and mean nothing. That
@@ -81,20 +96,43 @@ fixtures, and the story is in [FEEDBACK.md](FEEDBACK.md).
 
     pip install -e ".[dev]"
     python -m pulled.server          # http://127.0.0.1:8931/mcp
-    pytest                           # 14 tests, no network, no port opened
+    pytest                           # 33 tests, no network, no port opened
 
 The suite drives the server through an in-memory client and server pair, so no
 socket is opened and a failing run cannot leave a listener behind.
 
 ## Data
 
-`api.fda.gov/food/enforcement.json`, public, no key, rate limited to 240
-requests per minute for anonymous callers. Responses are cached on disk for six
-hours and the cache is also the fallback when the API is unreachable.
+| source | shape | cached |
+| --- | --- | --- |
+| `api.fda.gov/food/enforcement.json` | server side search, no key, 240 requests a minute | six hours, per query |
+| `fsis.usda.gov/fsis/api/recall/v/1` | one 13 MB document, every record ever, no filtering | six hours, whole feed |
 
-Scope is United States enforcement reports. A clear result means nothing was
-found in that feed. It is not a safety certificate, and the wording the server
-reads aloud says so.
+Both are public and unauthenticated. Each cache is also the fallback when its
+service is unreachable, and a source that fails is skipped rather than raised,
+because an answer from one agency beats an error naming two.
+
+Scope is United States. A clear result means nothing was found in either feed.
+It is not a safety certificate, and the wording the server reads aloud says so.
+
+Three things the USDA feed does not give you, all handled here and all written
+up in [FEEDBACK.md](FEEDBACK.md).
+
+- **It is published twice, once in Spanish, under the same recall number.**
+  789 numbers of 2 023 records are doubled that way, so a matcher that looks
+  for a near tie finds one on every query. Deduplicated, the feed holds 1 234
+  recalls.
+- **Its reason field never names the allergen.** 361 records say
+  `Unreported Allergens` and stop. The allergen is lifted out of the press
+  release instead, which names it in 354 of them.
+- **169 of its records are alerts, not recalls.** This server says so in those
+  words rather than telling someone their dinner has been pulled from sale.
+
+## Every number in here is falsifiable
+
+[AFFIRMATIONS.md](AFFIRMATIONS.md) lists each figure quoted in this repository
+next to the command that disproves it. A green suite says what the code does,
+it says nothing about a sentence in a README.
 
 ## Licence
 
