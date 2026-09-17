@@ -94,12 +94,69 @@ of this, because `3.17oz`, `pouch` and `per` look rare and mean nothing. That
 list grew from running the matcher against the live feed rather than against
 fixtures, and the story is in [FEEDBACK.md](FEEDBACK.md).
 
+## What a transcriber does to it
+
+Everything above was built on what people type. Spoken through a speech
+engine and transcribed by Whisper, `Loard's ice cream` comes back as `Lord's
+ice cream`. No record carries lord and the FDA search asked for every word, so
+that side came back empty, and a USDA record for Brazilian pastries won at 0.68
+on the word cream. The assistant then asked whether the tub was the one from
+WOW Frozen Food.
+
+Three changes.
+
+- A fixed list of words people say around a name, `from`, `shop`,
+  `recalled`, is dropped before searching and matching, as packaging words
+  already were. It is a list, so it misses some. When the FDA search still finds
+  nothing, words that appear on no record in the whole feed are dropped, then
+  each remaining word takes its turn being the one left out. What comes back is
+  ranked by how many of the caller's words each record carries and capped at
+  fifty. A sentence of more than eight searchable words is not retried.
+- A heard word that no candidate carries is respelt as the record word one
+  letter away from it, when exactly one such word exists, both are at least four
+  letters long and they start with the same letter. The respelling changes
+  which record ranks first and how well it scores.
+- It never makes a yes on its own. A confident answer still has to clear the
+  bar on the words that were heard exactly, so `pear puree` against a Peas
+  Puree record from Peas Kitchen is a question. And a word that no candidate
+  carries at all, perhaps the brand of something never recalled, turns a yes
+  into a question, so `zebra pistachio ice cream` does not borrow Loard's
+  recall. The cost is more questions, and a brand heard wrong can stay a
+  question the caller cannot settle by saying yes.
+
+`python evaluate.py 200` takes 200 records of 2026 from the live FDA
+feed, shortens each name the way someone reading a pack would, and asks the
+matcher. `--misheard` deletes the third letter of the first word of five letters
+or more before asking, loard becoming lord. Measured on 17 September 2026, the
+before columns with the package from `5b1a015` and this `evaluate.py`.
+
+| outcome, of 200 records | before, as read | before, misheard | after, as read | after, misheard |
+| --- | --- | --- | --- | --- |
+| the record came back | 71.0 % | 1.0 % | 72.5 % | 28.0 % |
+| still unsure after one question | 23.0 % | 59.0 % | 25.0 % | 70.0 % |
+| a different record, named with confidence | 0.5 % | 3.5 % | 0.5 % | 0.0 % |
+| nothing came back | 3.5 % | 34.5 % | 0.0 % | 0.0 % |
+
+The row that mattered was the last one. One lost letter used to turn a
+recalled product into `no recall matching that` about one time in three, and
+on these 200 records it now never does. Most
+misheard descriptions now end in a question rather than an answer, which is
+the middle outcome doing its job and not a solved problem.
+
+Read these as the easy end of speech. The mutation never touches the first
+letter and never substitutes or swaps, a description with no word of five
+letters goes through unchanged, and the answer to the follow-up question is
+read off the record without being misheard. Four records have a name under two
+words and are skipped in every column. And leaving the brand out of `Lord's ice
+cream` searches for the fifty newest ice cream recalls, which today still holds
+36 of the 43 Loard's records and will hold fewer as newer ones are filed.
+
 ## Running it
 
     pip install -e ".[dev]"
     python -m pulled.server          # http://127.0.0.1:8931/mcp
-    pytest                           # 34 tests
-    python no_network.py             # the same 34, with the network refused
+    pytest                           # 48 tests
+    python no_network.py             # the same 48, with the network refused
 
 The suite drives the server through an in-memory client and server pair rather
 than a socket, so it listens on nothing and a failing run cannot leave a
