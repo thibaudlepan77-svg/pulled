@@ -38,6 +38,14 @@ FILLER = {
     "assorted", "variety", "individually", "wrapped", "frozen", "fresh",
     "approximately", "approx", "gross", "weight", "weights", "nos", "number",
 }
+# Words a caller says around the name that no label is asked to match,
+# `cheddar crackers from the corner shop`. Kept apart from FILLER because some
+# of them are brand words on a record, Market Pantry, so they are dropped from
+# the search and the score but can still stop a yes.
+SPOKEN = {"about", "what", "recall", "recalled", "these", "got", "have", "has",
+          "still", "okay", "does", "from", "bought", "shop", "store", "corner",
+          "market", "supermarket", "grocery", "fridge", "freezer", "pantry",
+          "today", "yesterday", "there"}
 SPLIT = re.compile(r"[^a-z0-9]+")
 QUOTED = re.compile(u'[“”"]([^“”"]{3,120})[“”"]')
 # 3.17oz splits into 3 and 17oz, and 17oz then looks like a rare, meaningful
@@ -182,10 +190,53 @@ def _clarifier(recall: Recall, spoken: list[str], unsaid: str | None = None) -> 
     return f"Is yours the {recall.product.split(',')[0].strip()}?"
 
 
+def _one_letter_apart(heard: str, written: str) -> bool:
+    if abs(len(heard) - len(written)) > 1 or heard[0] != written[0]:
+        return False
+    if len(heard) == len(written):
+        return sum(a != b for a, b in zip(heard, written)) == 1
+    short, long = sorted((heard, written), key=len)
+    return any(long[:i] + long[i + 1:] == short for i in range(len(long)))
+
+
+def _vocabulary(pool: list[Recall]) -> set[str]:
+    words = set()
+    for recall in pool:
+        words.update(tokens(recall.product))
+        words.update(tokens(recall.firm))
+    return words
+
+
+def _as_written(spoken: list[str], pool: list[Recall]) -> list[str]:
+    """Spoken words put back into the spelling the records use.
+
+    A transcriber spells a brand the way it sounds. `Loard's` comes back as
+    `lord's`, which no record carries, and the one word that named the tub then
+    counts for nothing. A heard word that is missing from every record is
+    replaced by the record word it is one letter away from, but only when there
+    is exactly one such word, and never for short words, where one letter is
+    most of the word.
+    """
+    vocabulary = _vocabulary(pool)
+    written = []
+    for word in spoken:
+        near = []
+        if word not in vocabulary and len(word) >= 4:
+            near = [w for w in vocabulary if len(w) >= 4 and _one_letter_apart(word, w)]
+        written.append(near[0] if len(near) == 1 else word)
+    return written
+
+
 def best(spoken_description: str, pool: list[Recall]) -> Verdict:
-    spoken = tokens(spoken_description)
-    if not spoken or not pool:
+    said = tokens(spoken_description)
+    heard = [word for word in said if word not in SPOKEN]
+    if not heard or not pool:
         return Verdict("clear", 0.0, None)
+    # The respelling finds and ranks the record, it never vouches for it.
+    # `pear puree` respelt as peas would score a perfect yes on a peas record,
+    # and if peas is also the maker's name the unsaid word rule waves it
+    # through. So a yes has to stand on the words that were heard exactly.
+    spoken = _as_written(heard, pool)
 
     rarity = _rarity(pool)
     ranked = sorted(((_score(spoken, r, rarity), r) for r in pool),
@@ -199,9 +250,17 @@ def best(spoken_description: str, pool: list[Recall]) -> Verdict:
         # manufacturer, and in this feed those carry different allergens.
         if len(tied) > 1:
             return Verdict("unclear", score, recall, _crowded(tied, spoken))
-        unsaid = _unsaid(spoken, recall, rarity)
+        unsaid = _unsaid(heard, recall, rarity)
         if unsaid:
             return Verdict("unclear", score, recall, _clarifier(recall, spoken, unsaid))
+        if spoken != heard and _score(heard, recall, rarity) < CONFIDENT:
+            return Verdict("unclear", score, recall, _clarifier(recall, heard))
+        # A word no candidate carries at all may be the brand of a product that
+        # was never recalled. `zebra pistachio ice cream` otherwise scores 0.81
+        # on a Loard's record, because an unknown word weighs the least. The
+        # words of speech count here too, Market Pantry is a brand.
+        if set(_as_written(said, pool)) - _vocabulary(pool):
+            return Verdict("unclear", score, recall, _clarifier(recall, heard))
         return Verdict("recalled", score, recall)
     if score >= WORTH_ASKING:
         return Verdict("unclear", score, recall, _clarifier(recall, spoken))
