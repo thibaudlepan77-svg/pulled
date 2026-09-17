@@ -7,6 +7,7 @@ normal path, not an optimisation.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import time
 import urllib.parse
@@ -47,7 +48,11 @@ def _to_recall(record: dict) -> Recall:
 
 
 def _cache_path(query: str) -> Path:
-    safe = urllib.parse.quote(query, safe="")[:150]
+    safe = urllib.parse.quote(query, safe="")
+    if len(safe) > 150:
+        # Cut at 150, a five word search and the same search without its last
+        # word shared a file, so a retry read the empty answer it was retrying.
+        safe = safe[:120] + "-" + hashlib.sha1(query.encode("utf-8")).hexdigest()[:16]
     return CACHE / f"{safe}.json"
 
 
