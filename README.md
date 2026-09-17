@@ -151,6 +151,13 @@ words and are skipped in every column. And leaving the brand out of `Lord's ice
 cream` searches for the fifty newest ice cream recalls, which today still holds
 36 of the 43 Loard's records and will hold fewer as newer ones are filed.
 
+`talk.py` is the conversation this came out of. A neural voice says each line,
+Whisper transcribes it, a language model client decides which tool to call over
+MCP on stdio, and a second voice reads the answer. The client gets no settings,
+project instructions, memory or built-in tools, only the three pulled tools, and
+nothing on the assistant side is scripted. The last take is in
+`take/transcript.json`, tool calls and server answers included.
+
 ## Running it
 
     pip install -e ".[dev]"

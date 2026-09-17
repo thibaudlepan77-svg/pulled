@@ -1,0 +1,116 @@
+[
+ {
+  "number": 1,
+  "said": "Hey, just so you know, my son is allergic to peanuts and my wife can't have milk.",
+  "heard": "Hey, just so you know, my son is allergic to peanuts and my wife can't have milk.",
+  "calls": [
+   {
+    "tool": "set_allergens",
+    "arguments": {
+     "allergens": [
+      "peanuts",
+      "milk"
+     ]
+    },
+    "answer": {
+     "allergens": [
+      "milk",
+      "peanuts"
+     ]
+    }
+   }
+  ],
+  "reply": "Got it, I've saved peanuts and milk as your household allergens. I'll flag any recalls or foods that involve those going forward.",
+  "seconds": 7.3
+ },
+ {
+  "number": 2,
+  "said": "I'm holding a bag of dark chocolate coconut almond bites. Is it safe?",
+  "heard": "I'm holding a bag of dark chocolate coconut almond bites. Is it safe?",
+  "calls": [
+   {
+    "tool": "check_item",
+    "arguments": {
+     "description": "dark chocolate coconut almond bites"
+    },
+    "answer": {
+     "outcome": "recalled",
+     "say": "Dark Chocolate Coconut Almond Bites from Bazzini LLC was recalled on 23 May 2026. The reason given is Undeclared peanuts. The recall is ongoing, Class I.",
+     "recall_number": "H-1228-2026",
+     "ongoing": true,
+     "lot_codes": "B15354, B15356, B15357, B15360, B15361, B15363",
+     "confidence": 1.0
+    }
+   }
+  ],
+  "reply": "That bag is not safe, it's been recalled for undeclared peanuts, which is a serious risk given your son's allergy. Please don't let him eat it, and set it aside or return it to the store.",
+  "seconds": 8.7
+ },
+ {
+  "number": 3,
+  "said": "What about this tub of Loard's ice cream?",
+  "heard": "What about this tub of Lord's ice cream?",
+  "calls": [
+   {
+    "tool": "check_item",
+    "arguments": {
+     "description": "Lord's ice cream"
+    },
+    "answer": {
+     "outcome": "unclear",
+     "say": "I found a recall that might be yours, but I am not sure.",
+     "ask": "I found 41 recalls that all match Ice Cream. What else does the front of the pack say?",
+     "candidate": "Banana Ice Cream - 32 oz (4 labels: Mollie Stone's; Dehoff's; Farmer Joe's, Piazza's Fine Foods) UPC: 8-12017-00903",
+     "confidence": 1.0
+    }
+   }
+  ],
+  "reply": "What else does the front of the pack say?",
+  "seconds": 13.4
+ },
+ {
+  "number": 4,
+  "said": "It says peanut butter fudge.",
+  "heard": "It says peanut butter fudge.",
+  "calls": [
+   {
+    "tool": "check_item",
+    "arguments": {
+     "description": "Lord's peanut butter fudge ice cream"
+    },
+    "answer": {
+     "outcome": "recalled",
+     "say": "Loard's Peanut Butter Fudge Ice Cream was recalled on 15 April 2026. The reason given is Undeclared Milk, Peanuts. The recall is ongoing, Class II.",
+     "recall_number": "H-0743-2026",
+     "ongoing": true,
+     "lot_codes": "None",
+     "confidence": 1.0
+    }
+   }
+  ],
+  "reply": "That tub is recalled too, it's Loard's Peanut Butter Fudge Ice Cream, pulled for undeclared milk and peanuts. That's a double risk for both your son and your wife, so keep it away from both of them and don't serve it.",
+  "seconds": 7.4
+ },
+ {
+  "number": 5,
+  "said": "And these cheddar crackers from the corner shop?",
+  "heard": "And these cheddar crackers from the corner shop?",
+  "calls": [
+   {
+    "tool": "check_item",
+    "arguments": {
+     "description": "cheddar crackers"
+    },
+    "answer": {
+     "outcome": "unclear",
+     "say": "I found a recall that might be yours, but I am not sure.",
+     "ask": "I found 8 recalls that all match Crackers. What else does the front of the pack say?",
+     "candidate": "Pepperidge Farm Goldfish Baked Snack Crackers, 45 Packs.  Containing 15 Flavor Blasted Xtra Cheddar Packs, 15 Colors Packs, 10 Pretzel Packs, and 5 Grahams Vanilla Cupcake.  Net Wt. 46 oz. (2.9 lbs) (1.3kg) UPC 14100-04731.",
+     "confidence": 1.0
+    }
+   }
+  ],
+  "reply": "What else does the front of the pack say?",
+  "seconds": 8.8
+ }
+]
