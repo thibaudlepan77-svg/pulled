@@ -1,0 +1,190 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>pulled, simulated Alexa+ kitchen display</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    width: 1600px; height: 900px; overflow: hidden;
+    background: radial-gradient(ellipse at 30% 40%, #2a2420 0%, #141110 70%);
+    font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+    color: #f2f2f2;
+  }
+  .tag {
+    position: absolute; left: 60px; top: 26px;
+    font-size: 17px; letter-spacing: .16em; text-transform: uppercase; color: #8a8178;
+  }
+
+  /* The device. A 10 inch landscape smart display on a fabric base. */
+  .device { position: absolute; left: 60px; top: 70px; width: 1000px; height: 760px; }
+  .bezel {
+    position: absolute; inset: 0 0 60px 0; border-radius: 34px;
+    background: #0b0b0c; box-shadow: 0 30px 60px rgba(0,0,0,.55), inset 0 0 0 2px #26262a;
+  }
+  .base {
+    position: absolute; left: 110px; right: 110px; bottom: 0; height: 110px; border-radius: 0 0 46px 46px;
+    background: repeating-linear-gradient(90deg, #3b3a3d 0 3px, #353437 3px 6px);
+  }
+  .camera { position: absolute; top: 14px; left: 50%; width: 10px; height: 10px; margin-left: -5px;
+            border-radius: 50%; background: #1d1d22; }
+  .screen {
+    position: absolute; left: 34px; right: 34px; top: 34px; bottom: 94px; border-radius: 10px;
+    overflow: hidden; background: linear-gradient(160deg, #13202b 0%, #0d141b 100%);
+    display: flex; flex-direction: column; padding: 92px 44px 40px;
+  }
+
+  .clock { position: absolute; left: 44px; top: 30px; font-size: 30px; color: #9fb3c4; font-weight: 300; }
+  .skill { position: absolute; right: 44px; top: 36px; font-size: 20px; color: #6f8597; }
+  .skill b { color: #b8c9d6; font-weight: 600; }
+
+  .heard { font-size: 30px; line-height: 1.3; color: #cfe3f2; font-weight: 300; min-height: 78px; }
+  .heard .mute { color: #50606d; }
+
+  .reply {
+    margin-top: 18px; font-size: 26px; line-height: 1.38; color: #ffffff; opacity: 0; transition: opacity .35s;
+  }
+  .reply.on { opacity: 1; }
+
+  .card {
+    margin-top: auto; border-radius: 14px; padding: 18px 26px; opacity: 0; transform: translateY(20px); transition: all .4s;
+    background: #1b2731; border-left: 10px solid #6f8597;
+  }
+  .card.on { opacity: 1; transform: none; }
+  .card.recalled { border-left-color: #e2553d; background: #2b1c1a; }
+  .card.unclear  { border-left-color: #e0a030; background: #2a2416; }
+  .card.clear    { border-left-color: #4fb26c; background: #16261b; }
+  .card.stored   { border-left-color: #5aa0d8; background: #17222d; }
+  .card .kind { font-size: 17px; letter-spacing: .16em; text-transform: uppercase; font-weight: 700; }
+  .card.recalled .kind { color: #ff8a70; }
+  .card.unclear .kind  { color: #f2c060; }
+  .card.clear .kind    { color: #7fd99a; }
+  .card.stored .kind   { color: #8cc4ee; }
+  .card .title { font-size: 25px; margin-top: 6px; color: #fff; }
+  .card .facts { display: flex; gap: 26px; margin-top: 10px; font-size: 17px; color: #b7aea6; white-space: nowrap; }
+  .card .facts:empty { display: none; }
+  .card .facts b { color: #ece4dc; font-weight: 600; }
+
+  /* The light bar along the bottom edge of the screen. */
+  .bar { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; opacity: 0; transition: opacity .25s; }
+  .bar.listening { opacity: 1; background: linear-gradient(90deg, #0a3d66, #1fb6ff, #0a3d66);
+                   background-size: 200% 100%; animation: sweep 1.2s linear infinite; }
+  .bar.thinking  { opacity: 1; background: #1fb6ff; animation: pulse .7s ease-in-out infinite alternate; }
+  .bar.speaking  { opacity: 1; background: linear-gradient(90deg, #1fb6ff, #6fe0ff, #1fb6ff);
+                   background-size: 200% 100%; animation: sweep 2.4s linear infinite; }
+  @keyframes sweep { from { background-position: 0 0; } to { background-position: -200% 0; } }
+  @keyframes pulse { from { opacity: .35; } to { opacity: 1; } }
+
+  /* What travels over MCP, beside the device. */
+  .wire { position: absolute; left: 1100px; top: 70px; width: 450px; height: 700px; }
+  .wire h2 { font-size: 17px; letter-spacing: .16em; text-transform: uppercase; color: #8a8178; font-weight: 600; }
+  .wire .sub { font-size: 16px; color: #6a625b; margin-top: 6px; }
+  .log { margin-top: 22px; display: flex; flex-direction: column; gap: 14px; }
+  .call {
+    font-family: "Cascadia Code", Consolas, monospace; font-size: 16px; line-height: 1.45;
+    background: #1a1715; border: 1px solid #2e2925; border-radius: 10px; padding: 14px 16px;
+    color: #c9c0b7; white-space: pre-wrap; word-break: break-word;
+  }
+  .call .m { color: #8fb8dc; }
+  .call .r { color: #e2553d; } .call .u { color: #e0a030; } .call .c { color: #4fb26c; } .call .s { color: #5aa0d8; }
+  .call.old { opacity: .38; }
+
+  .slate {
+    position: absolute; inset: 0; display: flex; flex-direction: column; justify-content: center;
+    padding: 0 160px; background: #141110; opacity: 0; transition: opacity .5s; pointer-events: none;
+  }
+  .slate.on { opacity: 1; }
+  .slate h1 { font-size: 64px; font-weight: 600; letter-spacing: -.01em; }
+  .slate p { font-size: 32px; line-height: 1.45; color: #c9c0b7; margin-top: 28px; max-width: 1200px; }
+  .slate .small { font-size: 24px; color: #8a8178; }
+</style>
+</head>
+<body>
+<div class="tag">Simulated Alexa+ experience &middot; real take, real MCP calls</div>
+
+<div class="device">
+  <div class="base"></div>
+  <div class="bezel">
+    <div class="camera"></div>
+    <div class="screen">
+      <div class="clock" id="clock">6:42 PM</div>
+      <div class="skill">tool server <b>pulled</b></div>
+      <div class="heard" id="heard"><span class="mute">Ask me whether something in your kitchen has been recalled.</span></div>
+      <div class="reply" id="reply"></div>
+      <div class="card" id="card"><div class="kind"></div><div class="title"></div><div class="facts"></div></div>
+      <div class="bar" id="bar"></div>
+    </div>
+  </div>
+</div>
+
+<div class="wire">
+  <h2>MCP, as it happened</h2>
+  <div class="sub">tools/call sent by the assistant, and what pulled returned</div>
+  <div class="log" id="log"></div>
+</div>
+
+<div class="slate" id="slate"><h1></h1><p></p><p class="small"></p></div>
+
+<script>
+const $ = id => document.getElementById(id);
+const escape = s => String(s).replace(/[&<>]/g, c => ({'&': '&amp;', '<': '&lt;', '>': '&gt;'}[c]));
+
+// A transcript that grows word by word while the person speaks, the way the
+// device shows what it hears.
+let typing = null;
+function listen(text, seconds) {
+  clearInterval(typing);
+  $('bar').className = 'bar listening';
+  $('reply').classList.remove('on');
+  $('card').classList.remove('on');
+  const words = text.split(' ');
+  let shown = 0;
+  $('heard').textContent = '';
+  typing = setInterval(() => {
+    shown += 1;
+    $('heard').textContent = words.slice(0, shown).join(' ');
+    if (shown >= words.length) clearInterval(typing);
+  }, Math.max(60, seconds * 1000 / (words.length + 1)));
+}
+
+function think(calls) {
+  clearInterval(typing);
+  $('bar').className = 'bar thinking';
+  document.querySelectorAll('.call').forEach(el => el.classList.add('old'));
+  for (const call of calls) {
+    const el = document.createElement('div');
+    el.className = 'call';
+    el.innerHTML = `<span class="m">${escape(call.tool)}</span>(${escape(JSON.stringify(call.arguments))})\n` +
+                   `&rarr; <span class="${call.mark}">${escape(call.outcome)}</span>`;
+    $('log').appendChild(el);
+  }
+  const log = $('log');
+  while (log.children.length > 5) log.removeChild(log.firstChild);
+}
+
+function speak(reply, card) {
+  $('bar').className = 'bar speaking';
+  $('reply').textContent = reply;
+  $('reply').classList.add('on');
+  const el = $('card');
+  el.className = 'card ' + card.kind;
+  el.querySelector('.kind').textContent = card.label;
+  el.querySelector('.title').textContent = card.title;
+  el.querySelector('.facts').innerHTML = card.facts
+    .map(([k, v]) => `<span>${escape(k)} <b>${escape(v)}</b></span>`).join('');
+  requestAnimationFrame(() => el.classList.add('on'));
+}
+
+function rest() { $('bar').className = 'bar'; }
+
+function slate(title, body, small) {
+  const el = $('slate');
+  el.querySelector('h1').textContent = title;
+  el.querySelectorAll('p')[0].textContent = body;
+  el.querySelectorAll('p')[1].textContent = small || '';
+  el.classList.add('on');
+}
+function unslate() { $('slate').classList.remove('on'); }
+</script>
+</body>
+</html>
