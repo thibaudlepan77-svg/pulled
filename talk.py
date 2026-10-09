@@ -140,6 +140,10 @@ def ask_claude(transcript: str, session: str | None, config: Path) -> dict:
                     pending[block["tool_use_id"]]["answer"] = body
         elif kind == "result":
             turn["session"] = event.get("session_id", turn["session"])
+            if event.get("is_error"):
+                # A failed login comes back as an ordinary assistant message,
+                # and would otherwise be read aloud as the answer.
+                raise RuntimeError("the client failed: " + str(event.get("result"))[:300])
     if not turn["reply"]:
         raise RuntimeError("no spoken reply, stderr: " + run.stderr[-600:])
     return turn
