@@ -81,7 +81,7 @@ Drop `--offline` to run it against the live feed. Neither opens a port.
 `sim/device.html` is a kitchen smart display with the light bar along its
 bottom edge, a live caption of what it heard, the spoken reply and a card for
 the result, red for a recall, amber when it needs one more word, green when it
-found nothing. Beside it, every `tools/call` the assistant sent and the outcome
+found nothing, blue when it has just saved something about the household. Beside it, every `tools/call` the assistant sent and the outcome
 pulled returned. `sim/film.py` plays the last take of `talk.py` on it with that
 take's own audio, and films it to `sim/out/pulled-device.mp4`. The caption, the
 reply, the card's contents and the tool calls are read from the take, not
